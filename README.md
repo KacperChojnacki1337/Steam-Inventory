@@ -50,6 +50,4 @@ Steam Inventory Tracker is a Python application that allows you to manage your S
 
 - Kacper Chojnacki - https://github.com/KacperChojnacki1337
 
-## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
