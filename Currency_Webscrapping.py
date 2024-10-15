@@ -22,7 +22,6 @@ def get_nbp_data(currency, start_date, end_date):
 
     # Creating DataFrame
     df = pd.DataFrame(rates, columns=['date', 'rate'])
-    df
     df['date'] = pd.to_datetime(df['date'])
     return df    
 
@@ -65,6 +64,7 @@ def insert_data_to_postgresql(dataframe):
         # Create the table with column names inferred from DataFrame headers
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS currency_table (
+            id SERIAL PRIMARY KEY,
             date DATE,
             rate NUMERIC
             );
@@ -75,3 +75,4 @@ def insert_data_to_postgresql(dataframe):
     currency_df.to_sql('currency_table',engine,if_exists='append', index=False)
     conn1.close()
 insert_data_to_postgresql(df_usd)
+
