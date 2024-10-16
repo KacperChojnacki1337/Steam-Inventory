@@ -472,7 +472,7 @@ if __name__ == '__main__':
     db_name = "steam_inventory"
     db_user = "postgres"
     db_password = "password"
-        # Connect to PostgreSQL database
+       # Connect to PostgreSQL database
     conn = psycopg2.connect(host=db_host, port=db_port, database=db_name, user=db_user, password=db_password)
     cursor = conn.cursor()
     conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
@@ -491,9 +491,50 @@ if __name__ == '__main__':
                total_return_percent REAL NOT NULL,
                total_return_dollar REAL, 
                item_link VARCHAR(255) NOT NULL);""")
-        print("Table created")
+        print("Tabela utworzona")
     except (psycopg2.Error, Exception) as err:  
         print("Error creating table:", err)
     steam_inventory = SteamInventory(conn)
     steam_inventory.item_list_update()
     steam_inventory.mainloop()
+    try:
+        # Insert data into inventory_data
+        cursor.execute("""
+        INSERT INTO inventory_data (
+        item_number,
+        "date",
+        item_name,
+        cost_per_item,
+        number_of_items,
+        current_price,
+        total_cost,
+        total_value,
+        item_link
+        )
+        SELECT
+          item_number,
+          "date",
+          item_name,
+          cost_per_item,
+          number_of_items,
+          current_price,
+          total_cost,
+          total_value,
+          item_link
+        FROM inventory i;
+          """)
+      # Update inventory_data with calculated values
+        cursor.execute("""
+            UPDATE inventory_data
+            SET 
+            update_date = to_date(to_char(current_timestamp, 'YYYY-MM-DD'), 'YYYY-MM-DD'), 
+        WHERE
+            update_date is null;
+        """)
+        conn.commit()
+        cursor.close()
+    except (Exception, psycopg2.DatabaseError) as error:
+      print(error)
+    finally:
+      if conn is not None:
+        conn.close()
