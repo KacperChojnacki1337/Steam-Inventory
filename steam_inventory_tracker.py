@@ -1,3 +1,12 @@
+
+import Currency_Webscrapping
+df= Currency_Webscrapping.get_nbp_data("USD", "2024-01-01", Currency_Webscrapping.endDay)
+df
+Currency_Webscrapping.insert_data_to_postgresql(df)
+
+
+
+
 import psycopg2, urllib.request, json, tkinter, time
 from sqlalchemy import create_engine
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
@@ -61,7 +70,7 @@ class InventoryWindow(tkinter.Toplevel):
         total_inventory_cost = 0
         for cost in cost_items:
             total_inventory_cost += cost[0]
-
+  
         self.inventory_stats_result.config(
             text=f"Total Inventory Value: {total_inventory_value}\n Total Inventory Cost: {total_inventory_cost}")
 
@@ -81,11 +90,14 @@ class InventoryWindow(tkinter.Toplevel):
         total_return_percent_length = 24    # float
         total_return_dollar_length = 20     # float
         item_link_length = 100
-        # number, date, item, cost_per_item, number_of_items, current_price, total_cost, total_value, total_return_percent, total_return_dollar, item_link
-
+        purchase_info_length = 20 # str
+        real_cost_per_item_length = 17 # float
+        real_total_cost = 17 #float
+        # number, date, item, cost_per_item, number_of_items, current_price, total_cost, total_value, total_return_percent, total_return_dollar, item_link, purchase_info, real cost per item, real total cost
+ 
         printable_list = []
         for number, date, item, cost_per_item, number_of_items, current_price, total_cost, total_value,\
-            total_return_percent, total_return_dollar, item_link in item_tuple:
+            total_return_percent, total_return_dollar, item_link, purchase_info, real_cost_per_item,real_total_cost in item_tuple:
             printable_list.append(column_maker(number, number_length))
             printable_list.append(column_maker(date, date_length))
             printable_list.append(column_maker(item, item_length))
@@ -97,25 +109,28 @@ class InventoryWindow(tkinter.Toplevel):
             printable_list.append(column_maker(total_return_percent, total_return_percent_length))
             printable_list.append(column_maker(total_return_dollar, total_return_dollar_length))
             printable_list.append(column_maker(item_link, item_link_length))
+            printable_list.append(column_maker(purchase_info,purchase_info_length))
+            printable_list.append(column_maker(real_cost_per_item,real_cost_per_item_length))
+            printable_list.append(column_maker(real_total_cost,real_total_cost_length))
 
-        group_list = [tuple(printable_list[n: n+11]) for n in range(0, len(printable_list), 11)]
+        group_list = [tuple(printable_list[n: n+14]) for n in range(0, len(printable_list), 14)]
         item_list = [''.join(x) for x in group_list]
 
         column_headers = ['Item #', 'Date', 'Item Name', 'Cost Per Item', 'Number of Items', 'Current Price',
-                          'Total Cost', 'Total Value', 'Total Return Percent', 'Total Return Value', 'Item Link']
+                          'Total Cost', 'Total Value', 'Total Return Percent', 'Total Return Value', 'Item Link', 'Purchase Info','Real Cost Per Item','Real Total Cost']
 
         column_headers_centered = []
         index = 0
         column_lengths = [number_length, date_length, item_length, cost_per_item_length, number_of_items_length,
                           current_price_length, total_cost_length, total_value_length, total_return_percent_length,
-                          total_return_dollar_length, item_link_length]
+                          total_return_dollar_length, item_link_length,purchase_info_length,real_cost_per_item_length,real_total_cost_length]
 
         for column in column_headers:
             y = column.center(column_lengths[index])
             column_headers_centered.append(y)
             index += 1
 
-        group_list2 = [tuple(column_headers_centered[n: n+11]) for n in range(0, len(column_headers_centered), 11)]
+        group_list2 = [tuple(column_headers_centered[n: n+14]) for n in range(0, len(column_headers_centered), 14)]
         column_headers_string = [''.join(x) for x in group_list2]
 
         new_list = column_headers_string + item_list
@@ -139,6 +154,9 @@ class SteamInventory(tkinter.Tk):
         self.total_cost = None
         self.total_return_percent = None
         self.total_return_dollar = None
+        self.purchase_info = None
+        self.real_cost_per_item = None
+        self.real_total_cost = None
         self.cursor = conn.cursor()
 
         # ==== GUI ====
@@ -176,6 +194,8 @@ class SteamInventory(tkinter.Tk):
         tkinter.Label(self, text="Item List", font=('Segoe UI Bold', 9), fg='white', background='grey') \
             .grid(row=0, column=0, sticky='s', columnspan=2, pady=2, padx=5)
 
+       
+        #change length of listbox                     
         self.select_item_listbox = tkinter.Listbox(self)
         self.select_item_listbox.grid(row=1, column=0, rowspan=14, sticky='nsew', columnspan=2, padx=5)
 
@@ -184,7 +204,7 @@ class SteamInventory(tkinter.Tk):
 
         self.select_item_listbox.config(yscrollcommand=self.select_item_scrollbox.set)
         self.select_item_scrollbox.config(command=self.select_item_listbox.yview)
-
+                   
         # ==== EDIT ITEM ====
         tkinter.Label(self, text='Add/Edit Item', font=('Segoe UI Bold', 9), fg='white', background='grey')\
             .grid(row=0, column=3, columnspan=2, pady=2, padx=5)
@@ -197,7 +217,9 @@ class SteamInventory(tkinter.Tk):
         tkinter.Label(self, text='Number of items:', fg='white', background='grey').grid(row=5, column=3, sticky='w')
         tkinter.Label(self, text='Current price:', fg='white', background='grey').grid(row=6, column=3, sticky='w')
         tkinter.Label(self, text='Steam Market Link:', fg='white', background='grey').grid(row=7, column=3, sticky='w')
-
+        tkinter.Label(self, text='Purchase Info:', fg='white', background='grey').grid(row=8, column=3, sticky='w')
+        tkinter.Label(self, text='Real Cost Per Item:', fg='white', background='grey').grid(row=9, column=3, sticky='w')
+       
         self.item_number_input = tkinter.StringVar()
         self.item_name_input = tkinter.StringVar()
         self.date_input = tkinter.StringVar()
@@ -205,7 +227,9 @@ class SteamInventory(tkinter.Tk):
         self.number_of_items_input = tkinter.StringVar()
         self.current_price_input = tkinter.StringVar()
         self.steam_market_link_input = tkinter.StringVar()
-
+        self.purchase_info_input = tkinter.StringVar()
+        self.real_cost_per_item_input = tkinter.StringVar()
+        ####
         item_number_entry = tkinter.Entry(self, textvariable=self.item_number_input)
         item_name_entry = tkinter.Entry(self, textvariable=self.item_name_input)
         date_entry = tkinter.Entry(self, textvariable=self.date_input)
@@ -213,6 +237,8 @@ class SteamInventory(tkinter.Tk):
         number_of_item_entry = tkinter.Entry(self, textvariable=self.number_of_items_input)
         current_price_entry = tkinter.Entry(self, textvariable=self.current_price_input)
         steam_market_link_entry = tkinter.Entry(self, textvariable=self.steam_market_link_input)
+        purchase_info_entry = tkinter.Entry(self, textvariable=self.purchase_info_input)
+        real_cost_per_item_entry = tkinter.Entry(self, textvariable=self.real_cost_per_item_input)
 
         item_number_entry.grid(row=1, column=4, sticky='nsew', padx=5, pady=2)
         item_name_entry.grid(row=2, column=4, sticky='nsew', padx=5, pady=2)
@@ -221,32 +247,34 @@ class SteamInventory(tkinter.Tk):
         number_of_item_entry.grid(row=5, column=4, sticky='nsew', padx=5, pady=2)
         current_price_entry.grid(row=6, column=4, sticky='nsew', padx=5, pady=2)
         steam_market_link_entry.grid(row=7, column=4, sticky='nsew', padx=5, pady=2)
+        purchase_info_entry.grid(row=8, column=4, sticky='nsew', padx=5, pady=2)
+        real_cost_per_item_entry.grid(row=9, column=4, sticky='nsew', padx=5, pady=2)
 
         add_button = tkinter.Button(self, text='Add', command=self.add_item)
-        add_button.grid(row=8, column=3, sticky='new', padx=14, pady=8)
+        add_button.grid(row=10, column=3, sticky='new', padx=14, pady=8)
 
         self.edit_button = tkinter.Button(self, text='Edit', command=self.edit_item)
-        self.edit_button.grid(row=8, column=4, sticky='new', padx=14, pady=8)
+        self.edit_button.grid(row=10, column=4, sticky='new', padx=14, pady=8)
 
         self.edit_result = tkinter.Label(self, background='grey')
-        self.edit_result.grid(row=9, column=3, sticky='n', columnspan=2)
-
+        self.edit_result.grid(row=11, column=3, sticky='n', columnspan=2)
+               ###########
         # ==== REMOVE ITEM ====
         tkinter.Label(self, text="Remove Item", font=('Segoe UI Bold', 9), fg='white', background='grey')\
-            .grid(row=11, column=3, columnspan=2, padx=5, pady=2)
+            .grid(row=12, column=3, columnspan=2, padx=5, pady=2)
         tkinter.Label(self, text='Item Number:', fg='white', background='grey')\
-            .grid(row=12, column=3, padx=5, pady=2, sticky='w')
+            .grid(row=13, column=3, padx=5, pady=2, sticky='w')
 
         self.item_number_to_remove = tkinter.IntVar()
         remove_item_entry = tkinter.Entry(self, textvariable=self.item_number_to_remove)
-        remove_item_entry.grid(row=12, column=4, sticky='nsew', padx=5, pady=2)
+        remove_item_entry.grid(row=13, column=4, sticky='nsew', padx=5, pady=2)
 
         remove_item_button = tkinter.Button(self, text='Enter', command=self.remove_item)
-        remove_item_button.grid(row=13, column=3, columnspan=2, sticky='new', padx=80, pady=8)
-
+        remove_item_button.grid(row=14, column=3, columnspan=2, sticky='new', padx=80, pady=8)
+    
         self.remove_item_result = tkinter.Label(self, background='grey')
-        self.remove_item_result.grid(row=14, column=3, columnspan=2)
-
+        self.remove_item_result.grid(row=15, column=3, columnspan=2)
+      
         # ==== CURRENT PRICE UPDATE ====
         tkinter.Label(self, text="Current Price Update", font=('Segoe UI Bold', 9), fg='white', background='grey')\
             .grid(row=16, column=0, columnspan=2)
@@ -258,7 +286,7 @@ class SteamInventory(tkinter.Tk):
         self.update_price_result.grid(row=18, column=0, columnspan=2, sticky='n')
 
         # ==== BLANK COLUMNS AND ROWS ====
-        tkinter.Label(self, padx=8, background='grey').grid(row=15, column=3)
+        tkinter.Label(self, padx=8, background='grey').grid(row=16, column=3)
         tkinter.Label(self, padx=8, background='grey').grid(row=10, column=3)
 
         show_inventory = tkinter.Button(self, text='Show Inventory', command=self.open_inventory)
@@ -301,12 +329,23 @@ class SteamInventory(tkinter.Tk):
             self.item_link = None
         else:
             self.item_link = self.steam_market_link_input.get()
+                                  
+        if len(self.purchase_info_input.get()) == 0:
+            self.purchase_info = None
+        else:
+            self.purchase_info = self.purchase_info_input.get()
+            
+        if len(self.real_cost_per_item.get()) == 0:
+            self.real_cost_per_item = None
+        else:
+            self.real_cost_per_item = self.real_cost_per_item_input.get()
+                                  
+
     def add_item(self):
         self.get_input()
         self.cursor.execute("""SELECT item_number FROM inventory WHERE (item_number = %s)""",
                                   (self.item_number,))
         row = self.cursor.fetchone()
-        print(row)
         if row:
             self.edit_result.config(text="Item already exists, please select another action", fg='#fda1a1')
             self.edit_result.after(3000, self.reset_result_text)
@@ -318,16 +357,19 @@ class SteamInventory(tkinter.Tk):
                         .replace("%28", "(").replace("%29", ")").replace("%26", "&")
                 self.total_cost = round(self.cost_per_item * self.number_of_items, 2)
                 self.total_value = round(self.current_price * self.number_of_items, 2)
+                self.real_total_cost = round(self.real_cost_per_item * self.number_of_items,2)
                 try:
                     self.total_return_percent = round(((self.current_price - self.cost_per_item) / self.cost_per_item) * 100, 2)
                 except ZeroDivisionError:
                     self.total_return_percent = 0
+                    
+                    #########
                 self.total_return_dollar = round(self.total_value - self.total_cost, 2)
-                add_sql = "INSERT INTO inventory VALUES(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+                add_sql = "INSERT INTO inventory VALUES(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,%s)"
                 self.cursor.execute(add_sql, (self.item_number, self.date, self.item_name, self.cost_per_item,
                                               self.number_of_items, self.current_price, self.total_cost,
                                               self.total_value, self.total_return_percent, self.total_return_dollar,
-                                              self.item_link))
+                                              self.item_link,self.purchase_info,self.real_cost_per_item,self.real_total_cost))
                 self.cursor.connection.commit()
                 self.edit_result.config(text="Item added", fg='#5bfba3')
                 self.edit_result.after(3000, self.reset_result_text)
@@ -336,7 +378,7 @@ class SteamInventory(tkinter.Tk):
                 self.edit_result.after(3000, self.reset_result_text)
 
         self.item_list_update()
-
+   
     def reset_result_text(self):
         self.edit_result.destroy()
         self.edit_result = tkinter.Label(self, background='grey')
@@ -363,10 +405,13 @@ class SteamInventory(tkinter.Tk):
                                 "current_price = COALESCE(%s, current_price), "
                                 "number_of_items = COALESCE(%s, number_of_items), "
                                 "item_name = COALESCE(%s, item_name), "
-                                "item_link = COALESCE(%s, item_link) "
+                                "item_link = COALESCE(%s, item_link), "
+                                "purchase_info = COALESCE(%s, purchase_info), "
+                                "real_cost_per_item = COALESCE(%s, real_cost_per_item) "
                                 "WHERE item_number = %s", (self.date, self.cost_per_item, self.current_price,
-                                                          self.number_of_items, self.item_name, self.item_link,
+                                                          self.number_of_items, self.item_name, self.item_link,self.purchase_info,self.real_cost_per_item,
                                                           self.item_number))
+                                       
             self.cursor.connection.commit()
             self.update_calculations(self.item_number)
             self.edit_result.config(text="Item Updated", fg='#5bfba3')
@@ -379,16 +424,19 @@ class SteamInventory(tkinter.Tk):
     def update_calculations(self,item_number):
         self.cursor.execute("SELECT cost_per_item FROM inventory WHERE item_number = %s",
                                             (item_number,))
-        print(item_number)
+        
         cost_per_item =  float(self.cursor.fetchone()[0])
         self.cursor.execute("SELECT number_of_items FROM inventory WHERE item_number = %s",
                                               (item_number,))
+        
         number_of_items =int(self.cursor.fetchone()[0])
         self.cursor.execute("SELECT current_price FROM inventory WHERE item_number = %s",
                                             (item_number,))
+        
         current_price = float(self.cursor.fetchone()[0])
         self.total_cost = round(cost_per_item * number_of_items, 2)
         self.total_value = round(current_price * number_of_items, 2)
+        self.real_total_cost = round(real_cost_per_item * number_of_items,2)
         try:
             total_return_percent = round(((current_price - cost_per_item) / cost_per_item) * 100, 2)
         except ZeroDivisionError:
@@ -398,13 +446,14 @@ class SteamInventory(tkinter.Tk):
         self.cursor.execute("UPDATE inventory SET "
                             "total_cost = %s, "
                             "total_value = %s, "
+                            "real_total_cost = %s,"
                             "total_return_percent = %s, "
                             "total_return_dollar = %s "
                             "WHERE item_number = %s",
-                            (self.total_cost, self.total_value, total_return_percent, total_return_dollar,
+                            (self.total_cost, self.total_value, self.real_total_cost,total_return_percent, total_return_dollar,
                              item_number))
         self.cursor.connection.commit()
-
+        
     def item_list_update(self):
         try:
             if self.cursor is None:
@@ -453,35 +502,33 @@ class SteamInventory(tkinter.Tk):
             self.cursor.connection.commit()
             self.cursor.execute("SELECT item_number FROM inventory WHERE item_link = %s AND number_of_items = %s AND date = %s", (url, number_of_items, date))
             item_number = self.cursor.fetchone()[0]
-            print(item_number)
-            print(self.item_number)
             self.update_calculations(item_number)
             self.update_price_result.config(text=f"Current price for item {item_number} has been updated", fg='#5bfba3')
             self.update()
             time.sleep(3.2)
-
+    
         self.update_price_result.config(text="Current prices updated for all items")
         self.update()
 
         self.update_price_result.after(3000, self.reset_result_text())
-
 
 if __name__ == '__main__':
     db_host = "localhost"
     db_port = 5432
     db_name = "steam_inventory"
     db_user = "postgres"
-    db_password = "password"
-       # Connect to PostgreSQL database
+    db_password = "Siadajkurduplu96!sql"
+        # Connect to PostgreSQL database
     conn = psycopg2.connect(host=db_host, port=db_port, database=db_name, user=db_user, password=db_password)
     cursor = conn.cursor()
     conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
     cursor.execute('SELECT current_database()')
     cursor.fetchall()
+    ##############################
     try:
         cursor.execute("""CREATE TABLE IF NOT EXISTS inventory
                (item_number SERIAL PRIMARY KEY, 
-               date TEXT NOT NULL, 
+               date DATE NOT NULL,
                item_name TEXT NOT NULL,
                cost_per_item REAL NOT NULL, 
                number_of_items INTEGER NOT NULL, 
@@ -490,7 +537,10 @@ if __name__ == '__main__':
                total_value REAL NOT NULL, 
                total_return_percent REAL NOT NULL,
                total_return_dollar REAL, 
-               item_link VARCHAR(255) NOT NULL);""")
+               item_link VARCHAR(255) NOT NULL,
+               purchase_info VARCHAR(255) NOT NULL,
+               real_cost_per_item REAL NOT NULL,
+               real_total_cost REAL NOT NULL);""")
         print("Tabela utworzona")
     except (psycopg2.Error, Exception) as err:  
         print("Error creating table:", err)
@@ -501,26 +551,35 @@ if __name__ == '__main__':
         # Insert data into inventory_data
         cursor.execute("""
         INSERT INTO inventory_data (
+        update_date,
         item_number,
-        "date",
         item_name,
         cost_per_item,
         number_of_items,
         current_price,
         total_cost,
         total_value,
-        item_link
+        item_link,
+        buy_date,
+        type_of_purchase_channel,
+         real_total_cost_per_item_pln,
+         real_total_cost_pln
+
         )
         SELECT
+          to_date(to_char(current_timestamp, 'YYYY-MM-DD'), 'YYYY-MM-DD') AS update_date,
           item_number,
-          "date",
           item_name,
           cost_per_item,
           number_of_items,
           current_price,
           total_cost,
           total_value,
-          item_link
+          item_link,
+          "date",
+          purchase_info,
+         real_cost_per_item,
+         real_total_cost
         FROM inventory i;
           """)
       # Update inventory_data with calculated values
