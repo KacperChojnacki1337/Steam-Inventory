@@ -521,7 +521,7 @@ if __name__ == '__main__':
     db_port = 5432
     db_name = "steam_inventory"
     db_user = "postgres"
-    db_password = "Siadajkurduplu96!sql"
+    db_password = "postgres"
         # Connect to PostgreSQL database
     conn = psycopg2.connect(host=db_host, port=db_port, database=db_name, user=db_user, password=db_password)
     cursor = conn.cursor()
