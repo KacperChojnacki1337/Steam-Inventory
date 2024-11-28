@@ -1,3 +1,15 @@
+import Currency_Webscrapping
+import pandas as pd
+import datetime
+
+
+df= Currency_Webscrapping.get_nbp_data("USD", "2024-01-01", Currency_Webscrapping.endDay)
+last_row = df.iloc[-1].copy() 
+last_row['date'] += datetime.timedelta(days=1)
+df = pd.concat([df, last_row.to_frame().T], ignore_index=True) 
+df
+Currency_Webscrapping.insert_data_to_postgresql(df)
+
 import psycopg2, urllib.request, json, tkinter, time
 from sqlalchemy import create_engine
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
@@ -325,11 +337,13 @@ class SteamInventory(tkinter.Tk):
             self.purchase_info = None
         else:
             self.purchase_info = self.purchase_info_input.get()
-            
-        if len(self.real_cost_per_item.get()) == 0:
-            self.real_cost_per_item = None
-        else:
+        
+        try:
             self.real_cost_per_item = float(self.real_cost_per_item_input.get())
+        except ValueError:
+            self.real_cost_per_item = 0
+            
+            
                                   
 
     def add_item(self):
@@ -356,7 +370,7 @@ class SteamInventory(tkinter.Tk):
                     
                     #########
                 self.total_return_dollar = round(self.total_value - self.total_cost, 2)
-                add_sql = "INSERT INTO inventory VALUES(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,%s)"
+                add_sql = "INSERT INTO inventory VALUES(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,%s,%s,%s)"
                 self.cursor.execute(add_sql, (self.item_number, self.buy_date, self.item_name, self.cost_per_item,
                                               self.number_of_items, self.current_price, self.total_cost,
                                               self.total_value, self.total_return_percent, self.total_return_dollar,
@@ -491,17 +505,34 @@ class SteamInventory(tkinter.Tk):
             market_hash_name = url[47:]
             target_url = "https://steamcommunity.com/market/priceoverview/?appid=730&currency=1&market_hash_name=" \
                          + market_hash_name
-            print(target_url)
-            url_request = urllib.request.urlopen(target_url)
+            num_retries = 3
+            item_price = None
+            for attempt in range(num_retries):
+                try: 
+                    url_request = urllib.request.urlopen(target_url)
+                    data = json.loads(url_request.read().decode())
+                    item_name = market_hash_name.replace('%20', ' ')
+                    lowest_price = data.get('lowest_price')
+                    if lowest_price is None:
+                        raise Exception("Lowest price not found")
+                    item_price = str(lowest_price)
+                    break
+                except Exception as e:
+                    print(f"Error fetching lowest price (attempt {attempt + 1}/{num_retries}): {e}")
+                    if attempt < num_retries - 1:  # Retry only if not the last attempt
+                        time.sleep(15)
             print(url_request)
-            data = json.loads(url_request.read().decode())
-            print(data)
-            item_name = market_hash_name.replace('%20', ' ')
             print(item_name)
-            item_price = str(data.get('lowest_price'))
             print(item_price)
+            print(data)
+            
+            if item_price is None or item_price == "" or item_price == "None":
+                print("Lowest price not found after retries. Using median price...")
+                item_price = str(data.get('median_price'))
+            else:
+                print("Item price is not None")
+                print(item_price)
             item_price = float(item_price.replace('$', ''))
-            print(item_price)
             self.cursor.execute("UPDATE inventory SET current_price = %s WHERE item_link = %s", (item_price, url))
             self.cursor.connection.commit()
             self.cursor.execute("SELECT item_number FROM inventory WHERE item_link = %s AND number_of_items = %s AND buy_date = %s", (url, number_of_items, buy_date))
