@@ -649,7 +649,7 @@ if __name__ == '__main__':
         cursor.execute("""
          update inventory_data 
           set 
-              cost_per_item_pln = cost_per_item * exchange_rate_update,
+              cost_per_item_pln = cost_per_item * exchange_rate,
               current_price_pln = current_price * exchange_rate_update
           where inventory_data.cost_per_item_pln is null;
         """) 
