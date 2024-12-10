@@ -83,7 +83,7 @@ def add_data_to_db():
             # Delete from inventory
             print(item_number)
             cursor.execute("DELETE FROM inventory WHERE item_number = %s", (item_number,))
-
+            cursor.execute("REFRESH MATERIALIZED VIEW vw_inventory_sales")
         success_label.config(text="Successfully added and removed from inventory.")
     except psycopg2.Error as e:
         error_label.config(text="Error: " + str(e))
