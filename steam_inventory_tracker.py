@@ -2,11 +2,11 @@ import Currency_Webscrapping
 import pandas as pd
 import datetime
 
-
-df= Currency_Webscrapping.get_nbp_data("USD", "2024-01-01", Currency_Webscrapping.endDay)
-last_row = df.iloc[-1].copy() 
-last_row['date'] += datetime.timedelta(days=1)
-df = pd.concat([df, last_row.to_frame().T], ignore_index=True) 
+df= Currency_Webscrapping.get_nbp_data("USD", "2024-01-01", Currency_Webscrapping.endDay)        
+last_row = df.iloc[-1].copy()
+while last_row['date'] < pd.to_datetime(datetime.date.today()):  # Porównanie z konwersją do Timestamp
+    last_row['date'] += datetime.timedelta(days=1)
+    df = pd.concat([df, last_row.to_frame().T], ignore_index=True)                
 df
 Currency_Webscrapping.insert_data_to_postgresql(df)
 
